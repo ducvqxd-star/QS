@@ -96,51 +96,49 @@ async def analyze_drawing(
     client = genai.Client(api_key=key)
 
     prompt = """
-    Bạn là Kỹ sư Trưởng QS (Quantity Surveyor) và Chuyên gia Dựng hình 3D Tham số Nội thất.
-    Nhiệm vụ: Phân tích bản vẽ kỹ thuật (2D mặt bằng/đứng/cắt hoặc 3D render) của BẤT KỲ sản phẩm nội thất nào (sofa cong, bàn đảo, ghế bành, tủ quần áo, giường ngủ, bàn console, quầy bar, vách ốp...).
+    Bạn là Kỹ sư Trưởng QS và Chuyên gia Dựng hình CAD 3D Nội thất.
+    Nhiệm vụ: Phân tích kỹ bản vẽ kỹ thuật 2D (mặt bằng, mặt đứng, mặt bên) và ảnh phối cảnh 3D của sản phẩm nội thất đính kèm (bàn trà lồng, bàn đảo, sofa cong, tủ, giường, vách...).
     
-    Yêu cầu xuất ra cấu trúc JSON thuần túy (không kèm markdown) gồm 3 phần chính để Three.js dựng hình chuẩn xác >95%:
+    Yêu cầu xuất ra cấu trúc JSON thuần túy (không kèm markdown):
     {
       "product_info": {
-        "product_name": "Tên chi tiết sản phẩm",
-        "category": "sofa" | "table" | "cabinet" | "chair" | "bed" | "panel" | "other",
-        "overall_dimensions": { "w": 4340, "d": 2420, "h": 660 }
+        "product_name": "Tên chuẩn xác của sản phẩm (VD: Bàn Trà Không Gian SP09, Ghế Sofa Góc Cong...)",
+        "category": "table" | "sofa" | "cabinet" | "chair" | "bed" | "other",
+        "overall_dimensions": { "w": 1535, "d": 1270, "h": 370 }
       },
       "scene_3d": [
         {
-          "name": "Tên cấu kiện 3D",
-          "shape": "box" | "cylinder" | "arc_curve",
+          "name": "Tên khối cấu tạo",
+          "shape": "cylinder" | "oval" | "box" | "arc_curve",
           "position": [x_mm, y_mm, z_mm],
           "size": [w_mm, d_mm, h_mm],
-          "radius": 0,
-          "innerR": 1200,
-          "outerR": 2200,
-          "startDeg": 0,
-          "endDeg": 80,
-          "height": 400,
-          "color": "#c2410c",
-          "metalness": 0.1,
-          "roughness": 0.5
+          "radius": 585,
+          "height": 85,
+          "rotation_deg": 30,
+          "color": "#334155",
+          "roughness": 0.5,
+          "metalness": 0.2
         }
       ],
       "costsheet_items": [
         {
           "group": "I" | "II" | "III" | "IV" | "V" | "VI" | "VII",
-          "code": "Mã vật tư chuẩn xưởng (VD: GTX20.3, MDF9, IN-DEX12, FB LE-01, NC-SOFA, B.BBTN.1...)",
-          "name": "Tên cấu kiện và mô tả kỹ thuật",
-          "g": 2.45,
-          "h": 0.03,
-          "i": 0.03,
-          "j": 3,
-          "unit": "m3" | "m2'" | "Công" | "Bộ",
-          "wastage": 1.1,
-          "price": 7200000
+          "code": "Mã vật tư chuẩn (VD: MDF9, GTX20.3, IN-DEX12, FB LE-01, NC-TU, B.BBTN.1...)",
+          "name": "Tên chi tiết cấu kiện",
+          "g": 1.17,
+          "h": 1.17,
+          "i": 0.085,
+          "j": 1,
+          "unit": "m2'" | "m3" | "Công" | "Bộ",
+          "wastage": 1.15,
+          "price": 1250000
         }
       ]
     }
-    Lưu ý:
-    - Nếu có phần khoét lỗ, đâm xuyên âm thì cho j mang giá trị âm (VD: j = -1).
-    - Cấu trúc "costsheet_items" phải phân bổ chuẩn theo 7 nhóm chi phí (I: Thầu phụ, II: Vật tư cốt, III: Hoàn thiện, IV: Nhân công, V: Bao bì, VI: Phụ kiện, VII: Source ngoài/Da nỉ).
+    Quy tắc bắt buộc:
+    - Nếu là bàn mặt tròn -> shape: "cylinder" (với radius = đường kính / 2, height = độ dày mặt).
+    - Nếu là mặt bàn hình elip / hạt đậu hữu cơ -> shape: "oval" (với size: [chiều dài, chiều rộng, độ dày]).
+    - Cấu trúc "costsheet_items" phải phân bổ đúng 7 nhóm chi phí (I đến VII), nếu khoét lỗ/giảm trừ thì j mang giá trị âm (j = -1).
     """
 
     last_err = None
