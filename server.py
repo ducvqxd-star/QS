@@ -80,12 +80,14 @@ def recommend_materials(hint: str = Query(..., min_length=2), limit: int = 3):
 
 @app.post("/api/ai/analyze-drawing")
 async def analyze_drawing(
-    file: UploadFile = File(...),
-    api_key: Optional[str] = Form(None)
+    file: UploadFile = File(...)
 ):
-    key = api_key or os.environ.get("GEMINI_API_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
-        raise HTTPException(status_code=400, detail="Vui lòng nhập Gemini API Key!")
+        raise HTTPException(
+            status_code=500, 
+            detail="Hệ thống chưa được cấu hình GEMINI_API_KEY trong biến môi trường máy chủ!"
+        )
 
     try:
         contents = await file.read()
