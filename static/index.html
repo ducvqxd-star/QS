@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Interior QS Studio - Hệ Thống Định Giá Nội Thất & Đọc Bản Vẽ AI</title>
+  <title>Interior QS Studio - Universal 3D Parametric & Costsheet Engine</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -14,7 +14,7 @@
     .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scroll::-webkit-scrollbar-track { background: #f8fafc; }
     .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-    .dropdown-search-list { max-height: 220px; overflow-y: auto; position: absolute; z-index: 50; width: 340px; }
+    .table-costsheet th, .table-costsheet td { padding: 4px 6px; font-size: 11px; white-space: nowrap; }
   </style>
 </head>
 <body class="flex flex-col h-screen select-none">
@@ -26,7 +26,7 @@
       <div>
         <h1 class="text-sm font-bold text-slate-800 flex items-center gap-2">
           Interior QS & 3D Parametric Studio
-          <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-medium">9.873 Vật Tư Đã Nạp</span>
+          <span class="text-[10px] px-2 py-0.5 rounded bg-sky-100 text-sky-700 border border-sky-300 font-semibold">Universal 3D Engine (>95%)</span>
         </h1>
       </div>
     </div>
@@ -34,25 +34,29 @@
     <!-- TABS ĐIỀU HƯỚNG CHÍNH -->
     <div class="flex h-full items-center gap-1 text-xs">
       <button onclick="switchTab('studio')" id="tab-btn-studio" class="tab-nav active px-4 h-full flex items-center gap-2 text-slate-600 hover:text-slate-900 transition">
-        <span>📐 3D Studio & Bản Vẽ</span>
+        <span>📐 3D Studio & Bản Vẽ AI</span>
       </button>
-      <button onclick="switchTab('audit')" id="tab-btn-audit" class="tab-nav px-4 h-full flex items-center gap-2 text-slate-600 hover:text-slate-900 transition">
-        <span>📋 Kiểm Duyệt Cấu Kiện & Tìm Vật Tư</span>
-        <span id="badge-count" class="bg-sky-100 text-sky-700 text-[10px] px-1.5 py-0.2 rounded-full border border-sky-300 font-semibold">6</span>
+      <button onclick="switchTab('costsheet')" id="tab-btn-costsheet" class="tab-nav px-4 h-full flex items-center gap-2 text-slate-600 hover:text-slate-900 transition">
+        <span>📑 Bảng Chi Tiết Costsheet (7 Nhóm)</span>
       </button>
       <button onclick="switchTab('master')" id="tab-btn-master" class="tab-nav px-4 h-full flex items-center gap-2 text-slate-600 hover:text-slate-900 transition">
-        <span>🔍 Tra Cứu Kho 9.873 Vật Tư</span>
+        <span>🔍 Kho Đơn Giá Xưởng</span>
       </button>
     </div>
 
     <!-- TỔNG TIỀN REALTIME & NÚT XUẤT -->
     <div class="flex items-center gap-3">
+      <div id="labor-audit-badge" class="px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border-emerald-300">
+        <span>⚖️ Nhân công:</span>
+        <span id="labor-audit-text" class="font-bold">Công chuẩn (8%-15%)</span>
+      </div>
+
       <div class="bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 text-right">
-        <span class="text-[10px] text-slate-500 block leading-tight font-medium">Dự Toán Xuất Xưởng:</span>
+        <span class="text-[10px] text-slate-500 block leading-tight font-medium">Đơn Giá Hoàn Thiện (Cột U/V):</span>
         <span id="header-grand-total" class="text-sm font-bold text-sky-600">0 VNĐ</span>
       </div>
-      <button onclick="exportToCSV()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
-        <span>📥 Xuất File Báo Giá / BOQ</span>
+      <button onclick="exportCostsheetToCSV()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+        <span>📥 Xuất Báo Cáo Costsheet</span>
       </button>
     </div>
   </header>
@@ -60,212 +64,169 @@
   <!-- BODY CONTENT CHÍNH -->
   <main class="flex-1 relative overflow-hidden flex">
 
-    <!-- ==================== TAB 1: 3D STUDIO & BẢN VẼ TỰ ĐỘNG ==================== -->
+    <!-- TAB 1: 3D STUDIO & TẢI BẢN VẼ -->
     <div id="tab-content-studio" class="w-full h-full flex">
-      
-      <!-- SIDEBAR TRÁI: UPLOAD BẢN VẼ & AI OCR THỰC TẾ -->
-      <aside class="w-96 bg-white border-r border-slate-200 flex flex-col shrink-0 z-10 custom-scroll overflow-y-auto shadow-sm">
+      <aside class="w-88 bg-white border-r border-slate-200 p-4 flex flex-col gap-3 shrink-0 z-10 custom-scroll overflow-y-auto" style="width: 22rem;">
         
-        <!-- SECTION 1: CẤU HÌNH API KEY VÀ TẢI BẢN VẼ THẬT -->
-        <div class="p-4 border-b border-slate-200 space-y-3">
+        <div class="space-y-2 border-b pb-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-              <span>🤖</span> Gemini AI Vision Engine
+              <span>🤖</span> Gemini Multi-Vision
             </span>
             <span class="text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200 font-semibold">gemini-3.8-flash</span>
           </div>
 
           <div>
-            <label class="text-[11px] font-semibold text-slate-600 block mb-1">Gemini API Key (Dùng chung cả công ty):</label>
+            <label class="text-[11px] font-semibold text-slate-600 block mb-1">Gemini API Key:</label>
             <input type="password" id="api-key-input" placeholder="AIzaSy..." class="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:border-sky-500 outline-none">
-            <span class="text-[10px] text-slate-400 mt-0.5 block">Key được lưu trên trình duyệt của nhân viên</span>
           </div>
 
-          <!-- DROPZONE FILE BẢN VẼ -->
           <div class="border-2 border-dashed border-sky-300 rounded-xl p-3 bg-sky-50/40 hover:bg-sky-50 transition cursor-pointer relative text-center group">
-            <input type="file" id="real-file-input" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onchange="uploadAndScanWithAI(event)">
+            <input type="file" id="real-file-input" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onchange="uploadAndScanWithUniversalAI(event)">
             <div class="text-xl mb-1 text-sky-600">📤</div>
-            <div class="text-xs font-bold text-slate-700">Tải lên Bản Vẽ Mới (2D / 3D Render)</div>
-            <div class="text-[10px] text-slate-500 mt-0.5">Chọn ảnh bất kỳ để AI tự quét và vẽ lại 3D</div>
+            <div class="text-xs font-bold text-slate-700">Tải Lên Bất Kỳ Bản Vẽ Mới</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">Sofa cong, giường, tủ, bàn console, quầy bar...</div>
           </div>
 
           <div id="ai-status" class="hidden p-2 rounded bg-sky-50 border border-sky-200 text-xs text-sky-800 flex items-center gap-2">
             <span class="animate-spin text-base">⏳</span>
-            <span id="ai-status-text">AI đang đọc bản vẽ và phân rã khối lượng...</span>
+            <span id="ai-status-text">AI đang phân rã hình học 3D & Costsheet...</span>
           </div>
         </div>
 
-        <!-- SECTION 2: BIÊN TẬP THÔNG SỐ (DÀI, RỘNG, CAO) -->
-        <div class="p-4 border-b border-slate-200 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-              <span>📐</span> Kích Thước Sản Phẩm (mm)
-            </span>
-            <span id="active-product-name" class="text-[10px] font-bold text-sky-700 truncate max-w-[140px]">Bàn Đảo + Vách Inox</span>
-          </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Kích Thước Phủ Bì (mm)</span>
+          <span id="active-product-tag" class="text-[10px] font-bold text-sky-700 truncate max-w-[130px]">Ghế sofa góc cong</span>
+        </div>
 
-          <!-- CHIỀU DÀI W -->
-          <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-            <div class="flex justify-between items-center mb-1 text-xs">
-              <label class="text-slate-700 font-semibold">Chiều Dài (W)</label>
-              <div class="flex items-center gap-1">
-                <input type="number" id="num-w" value="2550" onchange="syncFromInput('w')" class="w-20 bg-white border border-slate-300 text-sky-700 font-bold px-2 py-0.5 rounded text-right text-xs focus:border-sky-500 outline-none">
-                <span class="text-[10px] text-slate-500 font-medium">mm</span>
-              </div>
-            </div>
-            <input type="range" min="800" max="4000" step="10" value="2550" id="range-w" oninput="syncFromRange('w')" class="w-full h-1.5 bg-slate-200 rounded appearance-none cursor-pointer accent-sky-600">
+        <div class="space-y-2 text-xs">
+          <div>
+            <div class="flex justify-between mb-1"><span class="text-slate-600 font-medium">Chiều Dài (W)</span><b id="val-w" class="text-sky-700 font-mono">4340</b></div>
+            <input type="range" min="800" max="6000" step="10" value="4340" id="slider-w" oninput="sync3DScale()" class="w-full h-1.5 bg-slate-200 rounded appearance-none cursor-pointer accent-sky-600">
           </div>
-
-          <!-- CHIỀU SÂU D -->
-          <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-            <div class="flex justify-between items-center mb-1 text-xs">
-              <label class="text-slate-700 font-semibold">Chiều Sâu / Rộng (D)</label>
-              <div class="flex items-center gap-1">
-                <input type="number" id="num-d" value="500" onchange="syncFromInput('d')" class="w-20 bg-white border border-slate-300 text-sky-700 font-bold px-2 py-0.5 rounded text-right text-xs focus:border-sky-500 outline-none">
-                <span class="text-[10px] text-slate-500 font-medium">mm</span>
-              </div>
-            </div>
-            <input type="range" min="300" max="1500" step="10" value="500" id="range-d" oninput="syncFromRange('d')" class="w-full h-1.5 bg-slate-200 rounded appearance-none cursor-pointer accent-sky-600">
+          <div>
+            <div class="flex justify-between mb-1"><span class="text-slate-600 font-medium">Chiều Sâu / Rộng (D)</span><b id="val-d" class="text-sky-700 font-mono">2420</b></div>
+            <input type="range" min="400" max="4000" step="10" value="2420" id="slider-d" oninput="sync3DScale()" class="w-full h-1.5 bg-slate-200 rounded appearance-none cursor-pointer accent-sky-600">
           </div>
-
-          <!-- CHIỀU CAO H -->
-          <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-            <div class="flex justify-between items-center mb-1 text-xs">
-              <label class="text-slate-700 font-semibold">Chiều Cao Chính (H)</label>
-              <div class="flex items-center gap-1">
-                <input type="number" id="num-h" value="925" onchange="syncFromInput('h')" class="w-20 bg-white border border-slate-300 text-sky-700 font-bold px-2 py-0.5 rounded text-right text-xs focus:border-sky-500 outline-none">
-                <span class="text-[10px] text-slate-500 font-medium">mm</span>
-              </div>
-            </div>
-            <input type="range" min="400" max="2800" step="5" value="925" id="range-h" oninput="syncFromRange('h')" class="w-full h-1.5 bg-slate-200 rounded appearance-none cursor-pointer accent-sky-600">
+          <div>
+            <div class="flex justify-between mb-1"><span class="text-slate-600 font-medium">Chiều Cao Tổng (H)</span><b id="val-h" class="text-sky-700 font-mono">660</b></div>
+            <input type="range" min="300" max="2800" step="5" value="660" id="slider-h" oninput="sync3DScale()" class="w-full h-1.5 bg-slate-200 rounded appearance-none cursor-pointer accent-sky-600">
           </div>
         </div>
 
-        <!-- SECTION 3: TÁCH CỤM / BUNG PHÔI -->
-        <div class="p-4 space-y-2">
-          <div class="flex justify-between items-center text-xs">
-            <span class="font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-              <span>💥</span> Tách Cụm / Bung Phôi
-            </span>
-            <b id="val-exp" class="text-amber-600 font-bold">0%</b>
-          </div>
-          <input type="range" min="0" max="1" step="0.02" value="0" id="slider-exp" oninput="updateExplodedView()" class="w-full h-1.5 bg-slate-200 rounded appearance-none cursor-pointer accent-amber-600">
-          <p class="text-[10px] text-slate-500">Kéo trượt để tách rời các khối quan sát cấu tạo lắp ghép.</p>
+        <div class="pt-2 border-t space-y-1 text-xs">
+          <div class="flex justify-between mb-1"><span class="font-bold text-slate-800">Tách Khối (Exploded View)</span><b id="val-exp" class="text-amber-600 font-mono">0%</b></div>
+          <input type="range" min="0" max="1" step="0.02" value="0" id="slider-exp" oninput="update3DExplode()" class="w-full h-1.5 bg-slate-200 rounded appearance-none cursor-pointer accent-amber-600">
+          <p class="text-[10px] text-slate-400">Tách rời các module đệm, tựa lưng, khung gỗ và chân kim loại</p>
         </div>
 
       </aside>
 
-      <!-- VIEWPORT 3D CANVAS CHÍNH (NỀN SÁNG STUDIO) -->
       <div id="canvas-container" class="flex-1">
         <div class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-2 rounded-xl border border-slate-200 flex items-center gap-2 text-xs z-10 shadow-sm">
-          <span class="text-slate-500 font-medium">Góc nhìn:</span>
-          <button onclick="setCameraView('front')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium border border-slate-200 transition">Mặt Đứng A</button>
-          <button onclick="setCameraView('side')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium border border-slate-200 transition">Mặt Đứng B</button>
-          <button onclick="setCameraView('top')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium border border-slate-200 transition">Mặt Bằng</button>
-          <button onclick="setCameraView('iso')" class="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded border border-sky-200 font-semibold transition">Phối Cảnh 3D</button>
+          <button onclick="setCamera('front')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium">Mặt Đứng A</button>
+          <button onclick="setCamera('side')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium">Mặt Đứng B</button>
+          <button onclick="setCamera('top')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium">Mặt Bằng</button>
+          <button onclick="setCamera('iso')" class="px-2 py-1 bg-sky-50 text-sky-700 border border-sky-200 font-semibold rounded">Phối Cảnh 3D</button>
         </div>
-
         <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-200 text-[11px] text-slate-600 z-10 pointer-events-none shadow-xs font-medium">
-          🖱️ Giữ chuột trái: Xoay 360° | Chuột phải: Pan | Lăn chuột: Phóng to / Thu nhỏ
+          🖱️ Giữ chuột trái: Xoay 360° | Chuột phải: Pan | Lăn chuột: Thu phóng
         </div>
       </div>
     </div>
 
-    <!-- ==================== TAB 2: KIỂM DUYỆT CẤU KIỆN & TÌM VẬT TƯ ==================== -->
-    <div id="tab-content-audit" class="hidden w-full h-full p-6 overflow-y-auto bg-slate-50 custom-scroll">
-      <div class="max-w-7xl mx-auto space-y-6">
-        
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-              <span>📋</span> Bảng Kiểm Duyệt Cấu Kiện & Tìm Kiếm Vật Liệu Masterdata
-            </h2>
-            <p class="text-xs text-slate-500">Gõ tên hoặc mã vật tư vào ô tìm kiếm để lấy đơn giá tức thì từ kho 9.873 vật tư.</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <button onclick="addNewBOMRow()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-xs flex items-center gap-1 shadow-sm transition">
-              <span>➕</span> Thêm Cấu Kiện Mới
-            </button>
-            <button onclick="recalculateTotals()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg text-xs flex items-center gap-1 shadow-sm transition">
-              <span>🔄</span> Cập Nhật & Tính Lại Giá
-            </button>
-          </div>
+    <!-- TAB 2: BẢNG COSTSHEET -->
+    <div id="tab-content-costsheet" class="hidden w-full h-full p-4 overflow-auto bg-slate-50 custom-scroll flex flex-col gap-3">
+      
+      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between text-xs shrink-0">
+        <div class="flex items-center gap-4">
+          <span class="font-bold text-slate-800 bg-sky-50 px-2 py-1 rounded border border-sky-200" id="cost-product-code">Mã: SF-01.HN</span>
+          <span class="font-semibold text-slate-700" id="cost-product-name">Ghế sofa góc cong cao cấp</span>
+          <span class="text-slate-500">Kích thước phủ bì: <b id="lbl-dim" class="text-sky-700">4340 x 2420 x 660 mm</b> (Đơn vị tính: <b class="text-slate-700">Bộ</b>)</span>
         </div>
-
-        <!-- BẢNG TỔNG HỢP KIỂM DUYỆT CÓ Ô TÌM KIẾM AUTOCOMPLETE -->
-        <div class="bg-white rounded-xl border border-slate-200 overflow-visible shadow-sm">
-          <table class="w-full text-xs text-left">
-            <thead class="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase text-[10px] tracking-wider font-bold">
-              <tr>
-                <th class="p-3 w-16">Mã VT</th>
-                <th class="p-3 w-40">Tên Cấu Kiện</th>
-                <th class="p-3 w-72">Tìm Vật Tư Trong Kho 9.873 Mã</th>
-                <th class="p-3">Mô Tả Quy Cách Chi Tiết</th>
-                <th class="p-3 text-center w-16">ĐVT</th>
-                <th class="p-3 text-right w-24">Khối Lượng</th>
-                <th class="p-3 text-right w-28">Đơn Giá Gốc</th>
-                <th class="p-3 text-right w-32">Thành Tiền (VNĐ)</th>
-                <th class="p-3 text-center w-12">Xóa</th>
-              </tr>
-            </thead>
-            <tbody id="audit-table-body" class="divide-y divide-slate-100 text-slate-700">
-              <!-- Render động -->
-            </tbody>
-          </table>
-        </div>
-
-        <!-- TỔNG HỢP DỰ TOÁN -->
-        <div class="grid grid-cols-3 gap-4">
-          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <span class="text-xs text-slate-500 font-medium block mb-1">Tổng Chi Phí Trực Tiếp (Vật tư + Nhân công)</span>
-            <div id="audit-direct-cost" class="text-xl font-bold text-slate-800">0 VNĐ</div>
-          </div>
-          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <span class="text-xs text-slate-500 font-medium block mb-1">Chi Phí Chung & Lợi Nhuận Xưởng (25%)</span>
-            <div id="audit-margin-cost" class="text-xl font-bold text-amber-600">0 VNĐ</div>
-          </div>
-          <div class="bg-sky-50 p-4 rounded-xl border border-sky-200 shadow-sm">
-            <span class="text-xs text-sky-800 font-semibold block mb-1">TỔNG GIÁ TRỊ DỰ TOÁN HOÀN THIỆN</span>
-            <div id="audit-grand-total" class="text-xl font-bold text-sky-700">0 VNĐ</div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- ==================== TAB 3: TRA CỨU KHO 9.873 VẬT TƯ MASTERDATA ==================== -->
-    <div id="tab-content-master" class="hidden w-full h-full p-6 overflow-y-auto bg-slate-50 custom-scroll">
-      <div class="max-w-6xl mx-auto space-y-5">
-        <div>
-          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-            <span>🔍</span> Tra Cứu Trực Tiếp Kho Vật Tư Masterdata
-          </h2>
-          <p class="text-xs text-slate-500">Tra cứu nhanh theo tên, mã hoặc nhà cung cấp (An Cường, Thanh Thùy, Minh Long, Picomat, Gỗ Tự Nhiên...)</p>
-        </div>
-
-        <!-- Ô TÌM KIẾM TẬP TRUNG -->
-        <div class="flex gap-3">
-          <input type="text" id="master-search-input" placeholder="Gõ từ khóa: MDF chống ẩm, sồi, picomat, laminate, inox..." onkeyup="onSearchMasterKeyup(event)" class="flex-1 bg-white border border-slate-300 rounded-lg px-3.5 py-2 text-xs text-slate-800 focus:border-sky-500 outline-none shadow-xs font-medium">
-          <button onclick="executeMasterSearch()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg shadow-sm">
-            Tìm Kiếm
+        <div class="flex items-center gap-2">
+          <button onclick="recalculateCostsheet()" class="px-3 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded font-semibold transition">
+            🔄 Tính Toán Lại Toàn Bộ
           </button>
         </div>
+      </div>
 
-        <!-- BẢNG KẾT QUẢ TÌM KIẾM -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-auto flex-1 custom-scroll">
+        <table class="w-full table-costsheet text-left border-collapse">
+          <thead class="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold sticky top-0 z-10">
+            <tr class="bg-slate-200/70 border-b border-slate-300 text-[10px] uppercase text-center">
+              <th colspan="3" class="border-r border-slate-300">Thông Tin Cấu Kiện</th>
+              <th colspan="5" class="border-r border-slate-300 bg-amber-50/80 text-amber-900">Kích Thước Thành Phẩm (Net)</th>
+              <th colspan="5" class="border-r border-slate-300 bg-sky-50/80 text-sky-900">Kích Thước Tính Toán Phôi (+0.05m Tề Mép)</th>
+              <th colspan="5" class="bg-emerald-50/80 text-emerald-900">Khối Lượng & Chi Phí Sản Xuất</th>
+              <th class="w-10"></th>
+            </tr>
+            <tr class="text-[10px]">
+              <th class="w-12 text-center border-r border-slate-200">STT</th>
+              <th class="w-24 border-r border-slate-200">Mã Code</th>
+              <th class="w-64 border-r border-slate-200">Tên Vật Tư / Quy Cách</th>
+              <th class="w-16 text-right bg-amber-50/40">Dài</th>
+              <th class="w-16 text-right bg-amber-50/40">Rộng</th>
+              <th class="w-16 text-right bg-amber-50/40">Dày/Cao</th>
+              <th class="w-12 text-center bg-amber-50/40">SL</th>
+              <th class="w-20 text-right border-r border-slate-200 font-mono text-amber-800 bg-amber-50/60">KLTP (Net)</th>
+              <th class="w-16 text-right bg-sky-50/40">Dài+0.05</th>
+              <th class="w-16 text-right bg-sky-50/40">Rộng+0.05</th>
+              <th class="w-16 text-right bg-sky-50/40">Cao/Dày</th>
+              <th class="w-12 text-center bg-sky-50/40">SL Phôi</th>
+              <th class="w-12 text-center border-r border-slate-200 font-semibold bg-sky-50/60">ĐVT</th>
+              <th class="w-20 text-right font-mono bg-emerald-50/30">KLTT</th>
+              <th class="w-16 text-center bg-emerald-50/30">% Hao Hụt</th>
+              <th class="w-20 text-right font-mono text-sky-700 bg-emerald-50/40 font-bold">KL TỔNG</th>
+              <th class="w-24 text-right bg-emerald-50/40">Đơn Giá Gốc</th>
+              <th class="w-28 text-right font-bold text-slate-900 bg-emerald-100/60 border-r border-slate-200">THÀNH TIỀN</th>
+              <th class="text-center w-8">Xóa</th>
+            </tr>
+          </thead>
+          <tbody id="costsheet-table-body" class="divide-y divide-slate-100 text-slate-700"></tbody>
+        </table>
+      </div>
+
+      <div class="grid grid-cols-4 gap-3 shrink-0">
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+          <span class="text-[11px] text-slate-500 font-medium block mb-0.5">I + II + III + VII: Tổng Vật Tư Cốt Lõi</span>
+          <div id="sum-materials" class="text-base font-bold text-slate-800">0 VNĐ</div>
+        </div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+          <span class="text-[11px] text-slate-500 font-medium block mb-0.5">IV: Nhân Công Xưởng & Lắp Đặt</span>
+          <div id="sum-labor" class="text-base font-bold text-amber-600">0 VNĐ</div>
+        </div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+          <span class="text-[11px] text-slate-500 font-medium block mb-0.5">PP (6%) + HM (1%) + V: Bao Bì & Phụ</span>
+          <div id="sum-overhead" class="text-base font-bold text-slate-700">0 VNĐ</div>
+        </div>
+        <div class="bg-sky-50 p-3 rounded-xl border border-sky-200 shadow-sm">
+          <span class="text-[11px] text-sky-800 font-bold block mb-0.5">TỔNG ĐƠN GIÁ HOÀN THIỆN (CỘT U/V)</span>
+          <div id="sum-grand-total" class="text-lg font-bold text-sky-700">0 VNĐ</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB 3: TRA CỨU ĐƠN GIÁ -->
+    <div id="tab-content-master" class="hidden w-full h-full p-6 overflow-y-auto bg-slate-50 custom-scroll">
+      <div class="max-w-5xl mx-auto space-y-4">
+        <div>
+          <h2 class="text-base font-bold text-slate-800">Bảng Tra Đơn Giá Chuẩn (Sheet: dongia)</h2>
+          <p class="text-xs text-slate-500">Tra cứu định mức hao hụt và đơn giá gốc vật tư thầu phụ, gỗ xẻ tạp, Inox 304 PVD, phụ kiện...</p>
+        </div>
         <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           <table class="w-full text-xs text-left">
-            <thead class="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase text-[10px] tracking-wider font-bold">
+            <thead class="bg-slate-100 text-slate-700 uppercase font-bold text-[10px]">
               <tr>
-                <th class="p-3 w-32">Mã Vật Tư</th>
-                <th class="p-3">Tên Vật Tư</th>
-                <th class="p-3 w-44">Nhóm / NCC</th>
-                <th class="p-3 text-center w-20">ĐVT</th>
-                <th class="p-3 text-right w-36">Đơn Giá Tổng (VNĐ)</th>
+                <th class="p-2.5 w-28">Mã VT</th>
+                <th class="p-2.5">Tên Vật Tư</th>
+                <th class="p-2.5 text-center w-20">ĐVT</th>
+                <th class="p-2.5 text-right w-28">% Hao Hụt</th>
+                <th class="p-2.5 text-right w-36">Đơn Giá Gốc</th>
               </tr>
             </thead>
-            <tbody id="master-search-results" class="divide-y divide-slate-100 text-slate-700">
-              <tr><td colspan="5" class="p-4 text-center text-slate-400">Nhập từ khóa phía trên để bắt đầu tra cứu</td></tr>
-            </tbody>
+            <tbody id="dongia-tbody" class="divide-y divide-slate-100 text-slate-700"></tbody>
           </table>
         </div>
       </div>
@@ -273,31 +234,56 @@
 
   </main>
 
-  <!-- JAVASCRIPT LOGIC -->
   <script>
-    // --- KHỞI TẠO DỮ LIỆU ---
-    let currentModel = {
-      productName: "Bàn Đảo + Vách Inox Không Gian",
-      w: 2550, d: 500, h: 925, over: 450, colh: 1375, exp: 0,
-      components: []
-    };
-
-    let bomList = [
-      { id: "MAT-01", name: "Plywood Uốn Cong", masterCode: "GO.1.01", masterName: "Plywood Uốn Cong 9mm", spec: "Dày 9mm (2 lớp) uốn R250", unit: "m²", qty: 4.85, rate: 380000 },
-      { id: "MAT-02", name: "Vỏ Ngoài Bọc Da", masterCode: "LEA-02", masterName: "Da Microfiber Cao Cấp", spec: "Da Microfiber kháng cào xước, mút D40", unit: "m²", qty: 4.85, rate: 850000 },
-      { id: "MAT-03", name: "Hộp Inox Đâm Xuyên", masterCode: "INX-01", masterName: "Inox 304 Gương Vàng PVD", spec: "Dày 1.2mm chấn bẻ bóng gương", unit: "m²", qty: 3.20, rate: 2400000 },
-      { id: "MAT-04", name: "Cột Inox Kịch Trần", masterCode: "INX-03", masterName: "Inox 304 Xước Đen Mờ", spec: "Dày 1.2mm xước đen titan kịch trần", unit: "m²", qty: 2.80, rate: 1950000 },
-      { id: "HRD-01", name: "Khung Xương Thép", masterCode: "STL-01", masterName: "Khung Xương Thép Chịu Lực", spec: "Thép hộp mạ kẽm gia cường console", unit: "Bộ", qty: 1, rate: 1200000 },
-      { id: "LAB-01", name: "Nhân Công Hoàn Thiện", masterCode: "LAB-01", masterName: "Nhân Công Uốn Cong & Chấn Inox", spec: "Thợ gia công xưởng và lắp đặt", unit: "m²", qty: 10.85, rate: 450000 }
+    const dongiaCatalog = [
+      { code: "GTX20.3", name: "Gỗ Tạp cứng-F20.3000 (khung chịu lực)", unit: "m3", wastage: 1.20, price: 7200000 },
+      { code: "MDF9", name: "MDF E2 chống ẩm 9mm (ván lót uốn cong)", unit: "m2'", wastage: 1.20, price: 72569.44 },
+      { code: "IN-DEX12", name: "Inox dày 1,2mm PVD đen xước (chấn bẻ)", unit: "m2'", wastage: 1.10, price: 3672000 },
+      { code: "FB LE-01", name: "Da bọc cao cấp (kèm mút D40)", unit: "m2'", wastage: 1.10, price: 1000000 },
+      { code: "NC-SOFA", name: "Nhân công - Đóng khung mộc & bọc đệm sofa", unit: "Công", wastage: 1.0, price: 650000 },
+      { code: "NC-TU", name: "Nhân công - Tủ (8%-12%)", unit: "Công", wastage: 1.0, price: 500000 },
+      { code: "NC-VACH", name: "Nhân công - Vách (8%-15%)", unit: "Công", wastage: 1.0, price: 500000 },
+      { code: "B.BBTN.1", name: "Bao bì sản phẩm xuất xưởng", unit: "m2'", wastage: 1.05, price: 25352.9 }
     ];
 
-    // --- THREE.JS 3D ENGINE ---
+    let currentProduct = {
+      name: "Ghế sofa góc cong cao cấp",
+      w: 4340, d: 2420, h: 660, exp: 0,
+      scene_3d: [
+        { name: "Đệm cong cánh cung", shape: "arc_curve", innerR: 1200, outerR: 2200, startDeg: 0, endDeg: 80, height: 400, color: "#c2410c", position: [-400, 0, -300] },
+        { name: "Tựa lưng cong", shape: "arc_curve", innerR: 2050, outerR: 2250, startDeg: 0, endDeg: 80, height: 260, color: "#9a3412", position: [-400, 400, -300] },
+        { name: "Khối văng góc chữ nhật vát", shape: "box", size: [1800, 1050, 400], color: "#c2410c", position: [1100, 200, 150] },
+        { name: "Tựa lưng văng góc", shape: "box", size: [1400, 220, 260], color: "#9a3412", position: [900, 530, 600] },
+        { name: "Chân sofa kim loại 1", shape: "cylinder", radius: 35, height: 80, color: "#1e293b", position: [-200, 40, -100] },
+        { name: "Chân sofa kim loại 2", shape: "cylinder", radius: 35, height: 80, color: "#1e293b", position: [800, 40, 400] },
+        { name: "Chân sofa kim loại 3", shape: "cylinder", radius: 35, height: 80, color: "#1e293b", position: [1800, 40, 100] },
+        { name: "Chân sofa kim loại 4", shape: "cylinder", radius: 35, height: 80, color: "#1e293b", position: [200, 40, -900] }
+      ]
+    };
+
+    let costsheetRows = [
+      { group: "I", isHeader: false, code: "KS.CHANSF", name: "Chân kim loại trụ sơn tĩnh điện / mạ PVD", g: 0.08, h: 0.08, i: 0.08, j: 8, unit: "Bộ", wastage: 1.05, price: 180000, fixedKL: 8 },
+      { group: "II", isHeader: false, code: "GTX20.3", name: "Gỗ xẻ tạp cứng làm khung sườn uốn cong", g: 3.80, h: 0.05, i: 0.04, j: 6, unit: "m3", wastage: 1.20, price: 7200000 },
+      { group: "II", isHeader: false, code: "GTX20.3", name: "Gỗ sườn giằng ngang & nan đáy chịu lực", g: 1.80, h: 0.05, i: 0.04, j: 12, unit: "m3", wastage: 1.20, price: 7200000 },
+      { group: "II", isHeader: false, code: "PLY.UON9", name: "Plywood uốn cong 9mm tạo dáng cánh cung", g: 3.60, h: 0.65, i: 0, j: 2, unit: "m2'", wastage: 1.20, price: 380000 },
+      { group: "II", isHeader: false, code: "PLY.UON9", name: "Plywood ốp tạo dáng tựa lưng cong", g: 4.10, h: 0.45, i: 0, j: 2, unit: "m2'", wastage: 1.20, price: 380000 },
+      { group: "III", isHeader: false, code: "IN-DEX12", name: "Nẹp viền trang trí Inox xước đen chân sofa", g: 4.34, h: 0.04, i: 0, j: 2, unit: "m2'", wastage: 1.10, price: 3672000 },
+      { group: "IV", isHeader: false, code: "NC-SOFA", name: "Nhân công mộc định hình khung cong & may bọc đệm", g: 0, h: 0, i: 0, j: 8, unit: "Công", wastage: 1.0, price: 650000, fixedKL: 8 },
+      { group: "V", isHeader: false, code: "B.BBTN.1", name: "Bao bì màng PE, bọc góc xốp & đóng gói", g: 4.34, h: 2.42, i: 0, j: 1, unit: "m2'", wastage: 1.05, price: 25352.9 },
+      { group: "VI", isHeader: false, code: "PK.LOXO", name: "Hệ lò xo sóng cường lực & dây đai thun đàn hồi", g: 0, h: 0, i: 0, j: 1, unit: "Bộ", wastage: 1.05, price: 1450000, fixedKL: 1 },
+      { group: "VII", isHeader: false, code: "FB LE-01", name: "Da bọc cao cấp mặt đệm ngồi cánh cung", g: 3.60, h: 0.95, i: 0, j: 1, unit: "m2'", wastage: 1.15, price: 1200000 },
+      { group: "VII", isHeader: false, code: "FB LE-01", name: "Da bọc tựa lưng cong cánh cung", g: 4.10, h: 0.70, i: 0, j: 1, unit: "m2'", wastage: 1.15, price: 1200000 },
+      { group: "VII", isHeader: false, code: "FB LE-01", name: "Da bọc khối đệm văng góc nằm (Chaise)", g: 1.85, h: 1.10, i: 0, j: 1, unit: "m2'", wastage: 1.15, price: 1200000 },
+      { group: "VII", isHeader: false, code: "FB LE-01", name: "Trừ diện tích hèm nối ngàm âm", g: 0.95, h: 0.40, i: 0, j: -1, unit: "m2'", wastage: 1.15, price: 1200000 },
+      { group: "VII", isHeader: false, code: "MUT.D40", name: "Đệm mút D40 kháng lún + bông microfiber tạo phồng", g: 4.34, h: 2.42, i: 0.20, j: 1, unit: "Bộ", wastage: 1.10, price: 5800000, fixedKL: 1 }
+    ];
+
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xe2e8f0);
 
-    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 10000);
-    camera.position.set(2400, 1900, 3100);
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 10, 20000);
+    camera.position.set(3800, 2600, 4200);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
@@ -306,81 +292,82 @@
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.target.set(1100, 700, 0);
+    controls.target.set(800, 300, 0);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-    const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.9);
-    dirLight1.position.set(2000, 4000, 2000);
-    scene.add(dirLight1);
-    const dirLight2 = new THREE.DirectionalLight(0xf8fafc, 0.6);
-    dirLight2.position.set(-2000, 2000, -2000);
-    scene.add(dirLight2);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
+    dirLight.position.set(3000, 5000, 3000);
+    scene.add(dirLight);
 
-    const grid = new THREE.GridHelper(6000, 30, 0x94a3b8, 0xcbd5e1);
+    const grid = new THREE.GridHelper(8000, 40, 0x94a3b8, 0xcbd5e1);
     grid.position.y = -1;
     scene.add(grid);
 
-    const modelGroup = new THREE.Group();
-    scene.add(modelGroup);
+    const group3D = new THREE.Group();
+    scene.add(group3D);
 
-    // VẼ MÔ HÌNH 3D
-    function draw3D() {
-      while(modelGroup.children.length > 0) {
-        modelGroup.remove(modelGroup.children[0]);
-      }
+    function buildDynamic3DModel() {
+      while(group3D.children.length > 0) { group3D.remove(group3D.children[0]); }
 
-      const { w, d, h, over, colh, exp } = currentModel;
-      const offset = exp * 450;
+      const scaleX = currentProduct.w / 4340;
+      const scaleZ = currentProduct.d / 2420;
+      const scaleY = currentProduct.h / 660;
+      const offsetExplode = currentProduct.exp * 350;
 
-      const matLeather = new THREE.MeshStandardMaterial({ color: 0x8b262a, roughness: 0.45, metalness: 0.05 });
-      const matInox = new THREE.MeshStandardMaterial({ color: 0xcfa84a, metalness: 0.9, roughness: 0.15 });
-      const matColumn = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.25 });
+      currentProduct.scene_3d.forEach((item, idx) => {
+        let mesh = null;
+        const mat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(item.color || "#c2410c"),
+          roughness: item.roughness || 0.45,
+          metalness: item.metalness || 0.1
+        });
 
-      const cLength = Math.max(600, w - over);
-      const r = d / 2;
-      const shellShape = new THREE.Shape();
-      shellShape.moveTo(0, -r);
-      shellShape.lineTo(cLength - r, -r);
-      shellShape.lineTo(cLength - r, r);
-      shellShape.lineTo(0, r);
-      shellShape.absarc(0, 0, r, Math.PI / 2, -Math.PI / 2, false);
+        const posX = (item.position ? item.position[0] : 0) * scaleX;
+        const posY = (item.position ? item.position[1] : 0) * scaleY + (offsetExplode * (idx % 3));
+        const posZ = (item.position ? item.position[2] : 0) * scaleZ;
 
-      const extrudeSettings = { depth: 100, bevelEnabled: true, bevelSize: 6, bevelThickness: 6, bevelSegments: 3 };
-      
-      const bottomGeo = new THREE.ExtrudeGeometry(shellShape, extrudeSettings);
-      const bottomMesh = new THREE.Mesh(bottomGeo, matLeather);
-      bottomMesh.rotation.x = -Math.PI / 2;
-      bottomMesh.position.set(r - offset, 100, 0);
-      modelGroup.add(bottomMesh);
+        if (item.shape === 'arc_curve') {
+          const inR = (item.innerR || 1200) * scaleZ;
+          const outR = (item.outerR || 2200) * scaleZ;
+          const h = (item.height || 400) * scaleY;
+          const startA = (item.startDeg || 0) * (Math.PI / 180);
+          const endA = (item.endDeg || 80) * (Math.PI / 180);
 
-      const topMesh = bottomMesh.clone();
-      topMesh.position.set(r - offset, h, 0);
-      modelGroup.add(topMesh);
+          const shape = new THREE.Shape();
+          shape.absarc(0, 0, outR, startA, endA, false);
+          shape.lineTo(inR * Math.cos(endA), inR * Math.sin(endA));
+          shape.absarc(0, 0, inR, endA, startA, true);
+          shape.closePath();
 
-      const curvedH = Math.max(100, h - 200);
-      const curvedGeo = new THREE.CylinderGeometry(r, r, curvedH, 32, 1, false, Math.PI / 2, Math.PI);
-      const curvedMesh = new THREE.Mesh(curvedGeo, matLeather);
-      curvedMesh.position.set(r - offset, 100 + curvedH / 2, 0);
-      modelGroup.add(curvedMesh);
+          const extrudeSettings = { depth: h, bevelEnabled: true, bevelSize: 20, bevelThickness: 20, bevelSegments: 4 };
+          const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+          mesh = new THREE.Mesh(geo, mat);
+          mesh.rotation.x = -Math.PI / 2;
+          mesh.position.set(posX, posY, posZ);
 
-      const inoxW = Math.max(500, w - 200);
-      const inoxH = curvedH;
-      const inoxD = Math.max(200, d - 60);
-      const inoxBoxGeo = new THREE.BoxGeometry(inoxW, inoxH, inoxD);
-      const inoxMesh = new THREE.Mesh(inoxBoxGeo, matInox);
-      inoxMesh.position.set((w / 2) + offset, 100 + inoxH / 2, 0);
-      modelGroup.add(inoxMesh);
+        } else if (item.shape === 'cylinder') {
+          const r = (item.radius || 35) * Math.min(scaleX, scaleZ);
+          const h = (item.height || 80) * scaleY;
+          const geo = new THREE.CylinderGeometry(r, r, h, 24);
+          mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(posX, posY, posZ);
 
-      const colGeo = new THREE.BoxGeometry(710, colh, 305);
-      const colMesh = new THREE.Mesh(colGeo, matColumn);
-      colMesh.position.set(450, h + colh / 2 + (offset * 1.5), 0);
-      modelGroup.add(colMesh);
+        } else if (item.shape === 'box') {
+          const sx = (item.size ? item.size[0] : 1000) * scaleX;
+          const sz = (item.size ? item.size[1] : 1000) * scaleZ;
+          const sy = (item.size ? item.size[2] : 400) * scaleY;
+          const geo = new THREE.BoxGeometry(sx, sy, sz);
+          mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(posX, posY, posZ);
+        }
 
-      calculateTotals();
+        if (mesh) {
+          group3D.add(mesh);
+        }
+      });
     }
 
-    // --- UPLOAD BẢN VẼ LÊN BACKEND & GỌI AI THỰC TẾ ---
-    async function uploadAndScanWithAI(event) {
+    async function uploadAndScanWithUniversalAI(event) {
       const file = event.target.files[0];
       if (!file) return;
 
@@ -389,7 +376,7 @@
       const statusText = document.getElementById('ai-status-text');
 
       statusDiv.classList.remove('hidden');
-      statusText.innerText = `Đang gửi bản vẽ ${file.name} đến AI Vision...`;
+      statusText.innerText = `Đang gửi bản vẽ đến Gemini Vision...`;
 
       const formData = new FormData();
       formData.append("file", file);
@@ -402,302 +389,280 @@
         });
 
         const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.detail || "Không thể phân tích bản vẽ");
-        }
+        if (!response.ok) throw new Error(result.detail || "Không phân tích được");
 
         const data = result.data;
-        statusText.innerText = `AI (${result.model_used}) đã nhận diện thành công: ${data.product_name}!`;
-        
-        // Cập nhật thông số từ AI vào mô hình
-        if (data.overall_dimensions) {
-          currentModel.w = data.overall_dimensions.w || currentModel.w;
-          currentModel.d = data.overall_dimensions.d || currentModel.d;
-          currentModel.h = data.overall_dimensions.h || currentModel.h;
+        statusText.innerText = `AI (${result.model_used}) đã nhận diện: ${data.product_info.product_name}!`;
 
-          document.getElementById('num-w').value = currentModel.w;
-          document.getElementById('range-w').value = currentModel.w;
-          document.getElementById('num-d').value = currentModel.d;
-          document.getElementById('range-d').value = currentModel.d;
-          document.getElementById('num-h').value = currentModel.h;
-          document.getElementById('range-h').value = currentModel.h;
+        if (data.product_info && data.product_info.overall_dimensions) {
+          const dims = data.product_info.overall_dimensions;
+          currentProduct.w = dims.w || currentProduct.w;
+          currentProduct.d = dims.d || currentProduct.d;
+          currentProduct.h = dims.h || currentProduct.h;
+
+          document.getElementById('slider-w').value = currentProduct.w;
+          document.getElementById('slider-d').value = currentProduct.d;
+          document.getElementById('slider-h').value = currentProduct.h;
+
+          document.getElementById('val-w').innerText = currentProduct.w;
+          document.getElementById('val-d').innerText = currentProduct.d;
+          document.getElementById('val-h').innerText = currentProduct.h;
+          document.getElementById('lbl-dim').innerText = `${currentProduct.w} x ${currentProduct.d} x ${currentProduct.h} mm`;
         }
 
-        document.getElementById('active-product-name').innerText = data.product_name || "Sản phẩm mới";
+        currentProduct.name = data.product_info.product_name;
+        document.getElementById('active-product-tag').innerText = currentProduct.name;
+        document.getElementById('cost-product-name').innerText = currentProduct.name;
 
-        // Tự động sinh cấu kiện từ AI vào BOM
-        if (data.components && data.components.length > 0) {
-          bomList = data.components.map((comp, idx) => ({
-            id: comp.id || `C0${idx+1}`,
-            name: comp.name || "Cấu kiện",
-            masterCode: "",
-            masterName: comp.material_hint || "Chưa gắn mã kho",
-            spec: comp.material_hint || "Theo bản vẽ",
-            unit: comp.unit || "m²",
-            qty: comp.estimated_qty || 1.0,
-            rate: 450000
-          }));
+        if (data.scene_3d && data.scene_3d.length > 0) {
+          currentProduct.scene_3d = data.scene_3d;
         }
 
-        draw3D();
-        renderAuditTable();
-        alert(`Bản vẽ đã được AI quét thành công! Kích thước: ${currentModel.w}x${currentModel.d}x${currentModel.h} mm. Vui lòng kiểm duyệt BOM.`);
+        if (data.costsheet_items && data.costsheet_items.length > 0) {
+          costsheetRows = data.costsheet_items;
+        }
+
+        buildDynamic3DModel();
+        renderCostsheet();
+        alert(`Bản vẽ đã phân tích thành công! Mô hình 3D đa năng và Costsheet 7 nhóm đã sẵn sàng.`);
 
       } catch (err) {
-        alert("Lỗi khi quét AI: " + err.message + "\n(Gợi ý: Kiểm tra lại Gemini API Key hoặc đảm bảo backend FastAPI đang chạy)");
+        alert("Lỗi khi quét AI: " + err.message);
       } finally {
         setTimeout(() => statusDiv.classList.add('hidden'), 4000);
       }
     }
 
-    // --- TÍNH TỔNG DỰ TOÁN ---
-    function calculateTotals() {
-      let directCost = 0;
-      bomList.forEach(item => {
-        item.amount = Math.round(item.qty * item.rate * 1.15); // Hao hụt 15%
-        directCost += item.amount;
-      });
+    function calculateRowData(r) {
+      if (r.fixedKL) {
+        return {
+          kltp: r.fixedKL,
+          m: 0, n: 0, o: 0, p: r.j,
+          kltt: r.fixedKL,
+          kltong: r.fixedKL,
+          amount: r.fixedKL * r.price
+        };
+      }
 
-      const grandTotal = Math.round(directCost * 1.25); // Lợi nhuận 25%
+      let kltp = 0;
+      if (r.unit === 'm3') {
+        kltp = r.g * r.h * r.i * r.j;
+      } else {
+        kltp = (r.g > 0 ? r.g : 1) * (r.h > 0 ? r.h : 1) * (r.i > 0 ? r.i : 1) * r.j;
+      }
 
-      document.getElementById('header-grand-total').innerText = grandTotal.toLocaleString('vi-VN') + " VNĐ";
-      document.getElementById('audit-direct-cost').innerText = directCost.toLocaleString('vi-VN') + " VNĐ";
-      document.getElementById('audit-margin-cost').innerText = Math.round(directCost * 0.25).toLocaleString('vi-VN') + " VNĐ";
-      document.getElementById('audit-grand-total').innerText = grandTotal.toLocaleString('vi-VN') + " VNĐ";
-      document.getElementById('badge-count').innerText = bomList.length;
+      let m = r.g > 0 ? (r.g + 0.05) : 0;
+      let n = r.h > 0 ? (r.unit === 'm3' ? r.h + 0.01 : r.h + 0.05) : 0;
+      let o = r.i > 0 ? (r.unit === 'm3' ? r.i : r.i + 0.05) : 0;
+      let p = r.j;
 
-      renderAuditTable();
+      let rawGross = 0;
+      if (r.unit === 'm3') {
+        rawGross = m * n * o * p;
+      } else {
+        rawGross = (m > 0 ? m : 1) * (n > 0 ? n : 1) * (o > 0 ? o : 1) * p;
+      }
+
+      let kltt = rawGross * (r.wastage || 1.15);
+      let kltong = kltt * 1;
+      let amount = kltong * r.price;
+
+      return { kltp, m, n, o, p, kltt, kltong, amount };
     }
 
-    // --- RENDER BẢNG AUDIT VỚI Ô TÌM KIẾM AUTOCOMPLETE VẬT TƯ ---
-    function renderAuditTable() {
-      const tbody = document.getElementById('audit-table-body');
+    function renderCostsheet() {
+      const tbody = document.getElementById('costsheet-table-body');
       tbody.innerHTML = '';
 
-      bomList.forEach((item, index) => {
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50 transition";
-        tr.innerHTML = `
-          <td class="p-2.5 font-mono text-slate-500 font-semibold">${item.id}</td>
-          <td class="p-2.5">
-            <input type="text" value="${item.name}" onchange="updateAuditCell(${index}, 'name', this.value)" class="w-full bg-transparent font-bold border-b border-transparent hover:border-slate-300 focus:border-sky-500 text-slate-800 outline-none">
-          </td>
-          <td class="p-2.5 relative">
-            <div class="flex items-center gap-1">
-              <input type="text" id="search-input-${index}" value="${item.masterName ? `[${item.masterCode}] ${item.masterName}` : ''}" placeholder="Gõ để tìm vật tư..." oninput="onSearchItemInput(${index}, this.value)" class="w-full bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded px-2 py-1 text-sky-700 font-semibold text-xs focus:border-sky-500 outline-none">
-              <button onclick="clearItemMaterial(${index})" class="text-slate-400 hover:text-rose-500 text-xs px-1">✕</button>
-            </div>
-            <div id="dropdown-${index}" class="dropdown-search-list hidden bg-white border border-slate-200 rounded-lg shadow-xl p-1 text-xs"></div>
-          </td>
-          <td class="p-2.5">
-            <input type="text" value="${item.spec || ''}" onchange="updateAuditCell(${index}, 'spec', this.value)" class="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-sky-500 text-slate-600 outline-none">
-          </td>
-          <td class="p-2.5 text-center">
-            <input type="text" value="${item.unit || ''}" onchange="updateAuditCell(${index}, 'unit', this.value)" class="w-12 bg-transparent text-center border-b border-transparent hover:border-slate-300 focus:border-sky-500 text-slate-700 font-medium outline-none">
-          </td>
-          <td class="p-2.5 text-right">
-            <input type="number" step="0.1" value="${item.qty}" onchange="updateAuditCell(${index}, 'qty', parseFloat(this.value))" class="w-20 bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5 text-right font-bold text-sky-700 outline-none">
-          </td>
-          <td class="p-2.5 text-right">
-            <input type="number" value="${item.rate}" onchange="updateAuditCell(${index}, 'rate', parseFloat(this.value))" class="w-24 bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5 text-right text-slate-700 font-medium outline-none">
-          </td>
-          <td class="p-2.5 text-right font-bold text-slate-900">
-            ${(item.amount || 0).toLocaleString('vi-VN')}
-          </td>
-          <td class="p-2.5 text-center">
-            <button onclick="removeBOMRow(${index})" class="text-rose-600 hover:text-rose-700 font-bold px-1.5 py-0.5 rounded hover:bg-rose-50">✕</button>
-          </td>
+      const groupNames = {
+        "I": "I. VẬT TƯ THẦU PHỤ (Chân kim loại / Khung định hình)",
+        "II": "II. VẬT TƯ CHÍNH (Khung gỗ xẻ tự nhiên, Plywood uốn cong)",
+        "III": "III. HOÀN THIỆN (Nẹp chỉ trang trí PVD, nẹp kim loại)",
+        "IV": "IV. NHÂN CÔNG SẢN XUẤT XƯỞNG & MAY BỌC",
+        "V": "V. BAO BÌ SẢN PHẨM XUẤT XƯỞNG",
+        "VI": "VI. PHỤ KIỆN (Lò xo sóng, đai thun cường lực)",
+        "VII": "VII. SOURCE NGOÀI (Da bò Ý / Microfiber, Mút D40)"
+      };
+
+      let groupTotals = { "I": 0, "II": 0, "III": 0, "IV": 0, "V": 0, "VI": 0, "VII": 0 };
+      let globalMaterialsSum = 0;
+
+      ["I", "II", "III", "IV", "V", "VI", "VII"].forEach(grpKey => {
+        const rowsInGrp = costsheetRows.filter(r => r.group === grpKey);
+
+        const trGrp = document.createElement('tr');
+        trGrp.className = "bg-slate-100/90 font-bold text-slate-800 text-[11px] border-t-2 border-slate-300";
+        trGrp.innerHTML = `
+          <td colspan="3" class="p-2 text-sky-800">${groupNames[grpKey]}</td>
+          <td colspan="5" class="text-right text-[10px] text-slate-500 font-normal">Subtotal nhóm:</td>
+          <td colspan="5"></td>
+          <td colspan="4" class="text-right p-2 font-mono text-sky-700" id="subtotal-${grpKey}">0 VNĐ</td>
+          <td></td>
         `;
-        tbody.appendChild(tr);
+        tbody.appendChild(trGrp);
+
+        let subtotal = 0;
+        rowsInGrp.forEach((r, idx) => {
+          const calc = calculateRowData(r);
+          subtotal += calc.amount;
+
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-sky-50/40 transition text-[11px] " + (r.j < 0 ? "bg-rose-50/40 text-rose-800" : "");
+          tr.innerHTML = `
+            <td class="text-center font-mono text-slate-400">${idx+1}</td>
+            <td class="font-mono font-bold text-sky-700">${r.code}</td>
+            <td class="font-semibold text-slate-800">${r.name}</td>
+            <td class="text-right font-mono bg-amber-50/20">${r.g ? r.g.toFixed(3) : '-'}</td>
+            <td class="text-right font-mono bg-amber-50/20">${r.h ? r.h.toFixed(3) : '-'}</td>
+            <td class="text-right font-mono bg-amber-50/20">${r.i ? r.i.toFixed(3) : '-'}</td>
+            <td class="text-center font-bold ${r.j < 0 ? 'text-rose-600' : 'text-slate-700'}">${r.j}</td>
+            <td class="text-right font-mono font-bold text-amber-800 bg-amber-50/30">${calc.kltp.toFixed(4)}</td>
+            <td class="text-right font-mono text-sky-700 bg-sky-50/20">${calc.m > 0 ? calc.m.toFixed(3) : '-'}</td>
+            <td class="text-right font-mono text-sky-700 bg-sky-50/20">${calc.n > 0 ? calc.n.toFixed(3) : '-'}</td>
+            <td class="text-right font-mono text-sky-700 bg-sky-50/20">${calc.o > 0 ? calc.o.toFixed(3) : '-'}</td>
+            <td class="text-center font-mono bg-sky-50/20">${calc.p}</td>
+            <td class="text-center font-semibold text-slate-600 border-r border-slate-200">${r.unit}</td>
+            <td class="text-right font-mono">${calc.kltt.toFixed(4)}</td>
+            <td class="text-center font-mono text-slate-500">${(( (r.wastage||1.15) - 1)*100).toFixed(0)}%</td>
+            <td class="text-right font-mono font-bold text-sky-700">${calc.kltong.toFixed(4)}</td>
+            <td class="text-right font-mono text-slate-600">${r.price.toLocaleString('vi-VN')}</td>
+            <td class="text-right font-mono font-bold text-slate-900 bg-emerald-50/30">${Math.round(calc.amount).toLocaleString('vi-VN')}</td>
+            <td class="text-center"><button onclick="deleteCostRow('${r.name}')" class="text-rose-500 hover:text-rose-700 text-xs">✕</button></td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        groupTotals[grpKey] = subtotal;
+        document.getElementById(`subtotal-${grpKey}`).innerText = Math.round(subtotal).toLocaleString('vi-VN') + " VNĐ";
       });
-    }
 
-    // --- TÌM KIẾM TỨC THÌ TỪ BACKEND KHI GÕ VÀO Ô VẬT TƯ ---
-    let searchDebounce = null;
-    function onSearchItemInput(index, query) {
-      clearTimeout(searchDebounce);
-      const dropdown = document.getElementById(`dropdown-${index}`);
+      globalMaterialsSum = groupTotals["I"] + groupTotals["II"] + groupTotals["III"] + groupTotals["VII"];
+      const ppCost = (globalMaterialsSum + groupTotals["IV"]) * 0.06;
+      const hmCost = globalMaterialsSum * 0.01;
+      const grandTotal = globalMaterialsSum + groupTotals["IV"] + groupTotals["V"] + groupTotals["VI"] + ppCost + hmCost;
 
-      if (!query || query.length < 1) {
-        dropdown.classList.add('hidden');
-        return;
-      }
+      const trOverhead = document.createElement('tr');
+      trOverhead.className = "bg-amber-50/60 font-semibold text-[11px] border-t-2 border-amber-300";
+      trOverhead.innerHTML = `
+        <td colspan="3" class="p-2">[PP] Phụ kiện, vật tư phụ đinh, keo, ốc vít liên kết (6%)</td>
+        <td colspan="5" class="text-slate-400 text-center">Tự động theo % vật tư & nhân công</td>
+        <td colspan="5"></td>
+        <td colspan="4" class="text-right p-2 font-mono text-amber-900">${Math.round(ppCost).toLocaleString('vi-VN')} VNĐ</td>
+        <td></td>
+      `;
+      tbody.appendChild(trOverhead);
 
-      searchDebounce = setTimeout(async () => {
-        try {
-          const res = await fetch(`/api/materials/search?q=${encodeURIComponent(query)}&limit=15`);
-          const materials = await res.json();
+      const trHM = document.createElement('tr');
+      trHM.className = "bg-amber-50/60 font-semibold text-[11px] border-b border-amber-300";
+      trHM.innerHTML = `
+        <td colspan="3" class="p-2">[HM] Hao hụt và chi phí dự phòng xưởng khác (1%)</td>
+        <td colspan="5" class="text-slate-400 text-center">Tự động theo % tổng vật tư</td>
+        <td colspan="5"></td>
+        <td colspan="4" class="text-right p-2 font-mono text-amber-900">${Math.round(hmCost).toLocaleString('vi-VN')} VNĐ</td>
+        <td></td>
+      `;
+      tbody.appendChild(trHM);
 
-          if (materials.length === 0) {
-            dropdown.innerHTML = `<div class="p-2 text-slate-400 text-center">Không tìm thấy vật tư nào</div>`;
-          } else {
-            dropdown.innerHTML = materials.map(m => `
-              <div onclick="selectMaterialForBOM(${index}, '${m.ma_vt}', '${m.ten_vt.replace(/'/g, "\\'")}', '${m.dvt}', ${m.don_gia})" class="p-2 hover:bg-sky-50 cursor-pointer rounded border-b border-slate-100 last:border-none">
-                <div class="flex justify-between items-center">
-                  <span class="font-mono text-sky-700 font-bold">[${m.ma_vt}]</span>
-                  <span class="font-bold text-slate-900">${m.don_gia.toLocaleString('vi-VN')} đ/${m.dvt}</span>
-                </div>
-                <div class="text-slate-800 font-medium truncate">${m.ten_vt}</div>
-                <div class="text-[10px] text-slate-400">${m.nhom_vt || ''} ${m.ncc ? '| ' + m.ncc : ''}</div>
-              </div>
-            `).join('');
-          }
-          dropdown.classList.remove('hidden');
-        } catch (e) {
-          console.error("Lỗi tìm kiếm:", e);
-        }
-      }, 200);
-    }
+      document.getElementById('header-grand-total').innerText = Math.round(grandTotal).toLocaleString('vi-VN') + " VNĐ";
+      document.getElementById('sum-grand-total').innerText = Math.round(grandTotal).toLocaleString('vi-VN') + " VNĐ";
+      document.getElementById('sum-materials').innerText = Math.round(globalMaterialsSum).toLocaleString('vi-VN') + " VNĐ";
+      document.getElementById('sum-labor').innerText = Math.round(groupTotals["IV"]).toLocaleString('vi-VN') + " VNĐ";
+      document.getElementById('sum-overhead').innerText = Math.round(groupTotals["V"] + ppCost + hmCost).toLocaleString('vi-VN') + " VNĐ";
 
-    function selectMaterialForBOM(index, ma_vt, ten_vt, dvt, don_gia) {
-      bomList[index].masterCode = ma_vt;
-      bomList[index].masterName = ten_vt;
-      bomList[index].unit = dvt || bomList[index].unit;
-      bomList[index].rate = don_gia;
-      bomList[index].spec = `Mã kho: ${ma_vt} - ${ten_vt}`;
-
-      document.getElementById(`dropdown-${index}`).classList.add('hidden');
-      calculateTotals();
-    }
-
-    function clearItemMaterial(index) {
-      bomList[index].masterCode = "";
-      bomList[index].masterName = "";
-      calculateTotals();
-    }
-
-    function updateAuditCell(index, field, value) {
-      bomList[index][field] = value;
-      calculateTotals();
-    }
-
-    function removeBOMRow(index) {
-      bomList.splice(index, 1);
-      calculateTotals();
-    }
-
-    function addNewBOMRow() {
-      bomList.push({
-        id: `C0${bomList.length + 1}`,
-        name: "Cấu kiện mới",
-        masterCode: "",
-        masterName: "",
-        spec: "Mô tả quy cách theo thiết kế",
-        unit: "m²",
-        qty: 1.0,
-        rate: 350000
-      });
-      calculateTotals();
-    }
-
-    function recalculateTotals() {
-      calculateTotals();
-      alert("Đã cập nhật toàn bộ bảng dự toán!");
-    }
-
-    // --- TAB 3: TÌM KIẾM VẬT TƯ TẬP TRUNG ---
-    function onSearchMasterKeyup(e) {
-      if (e.key === 'Enter') executeMasterSearch();
-    }
-
-    async function executeMasterSearch() {
-      const query = document.getElementById('master-search-input').value.trim();
-      if (!query) return;
-
-      const resultsTbody = document.getElementById('master-search-results');
-      resultsTbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-sky-600">Đang tìm kiếm trong 9.873 mã vật tư...</td></tr>`;
-
-      try {
-        const res = await fetch(`/api/materials/search?q=${encodeURIComponent(query)}&limit=50`);
-        const rows = await res.json();
-
-        if (rows.length === 0) {
-          resultsTbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">Không tìm thấy vật tư phù hợp</td></tr>`;
-          return;
-        }
-
-        resultsTbody.innerHTML = rows.map(r => `
-          <tr class="hover:bg-slate-50 transition">
-            <td class="p-3 font-mono font-bold text-sky-700">${r.ma_vt}</td>
-            <td class="p-3 font-semibold text-slate-800">${r.ten_vt}</td>
-            <td class="p-3 text-slate-500">${r.nhom_vt || ''} ${r.ncc ? '<br><span class="text-[10px] text-slate-400">' + r.ncc + '</span>' : ''}</td>
-            <td class="p-3 text-center text-slate-600">${r.dvt}</td>
-            <td class="p-3 text-right font-bold text-slate-900">${r.don_gia.toLocaleString('vi-VN')} đ</td>
-          </tr>
-        `).join('');
-      } catch (e) {
-        resultsTbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-rose-500">Lỗi kết nối máy chủ backend</td></tr>`;
-      }
-    }
-
-    // --- ĐỒNG BỘ SLIDER VÀ INPUT ---
-    function syncFromRange(key) {
-      const val = parseFloat(document.getElementById(`range-${key}`).value);
-      currentModel[key] = val;
-      document.getElementById(`num-${key}`).value = val;
-      draw3D();
-    }
-
-    function syncFromInput(key) {
-      const val = parseFloat(document.getElementById(`num-${key}`).value);
-      currentModel[key] = val;
-      document.getElementById(`range-${key}`).value = val;
-      draw3D();
-    }
-
-    function updateExplodedView() {
-      currentModel.exp = parseFloat(document.getElementById('slider-exp').value);
-      document.getElementById('val-exp').innerText = Math.round(currentModel.exp * 100) + "%";
-      draw3D();
-    }
-
-    function switchTab(tabId) {
-      ['studio', 'audit', 'master'].forEach(t => {
-        document.getElementById(`tab-content-${t}`).classList.add('hidden');
-        document.getElementById(`tab-btn-${t}`).classList.remove('active');
-      });
-      document.getElementById(`tab-content-${tabId}`).classList.remove('hidden');
-      document.getElementById(`tab-btn-${tabId}`).classList.add('active');
-
-      if (tabId === 'studio') onWindowResize();
-    }
-
-    function setCameraView(view) {
-      if (view === 'front') {
-        camera.position.set(1100, 700, 3800);
-        controls.target.set(1100, 700, 0);
-      } else if (view === 'side') {
-        camera.position.set(4000, 700, 0);
-        controls.target.set(1100, 700, 0);
-      } else if (view === 'top') {
-        camera.position.set(1100, 4200, 0);
-        controls.target.set(1100, 0, 0);
+      const laborRatio = globalMaterialsSum > 0 ? (groupTotals["IV"] / globalMaterialsSum) : 0;
+      const auditBadge = document.getElementById('labor-audit-badge');
+      const auditText = document.getElementById('labor-audit-text');
+      
+      if (laborRatio < 0.08) {
+        auditBadge.className = "px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1.5 bg-amber-50 text-amber-700 border-amber-300";
+        auditText.innerText = `Công thấp (${(laborRatio*100).toFixed(1)}% < 8%)`;
+      } else if (laborRatio > 0.15) {
+        auditBadge.className = "px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1.5 bg-rose-50 text-rose-700 border-rose-300";
+        auditText.innerText = `Công cao (${(laborRatio*100).toFixed(1)}% > 15%)`;
       } else {
-        camera.position.set(2400, 1900, 3100);
-        controls.target.set(1100, 700, 0);
+        auditBadge.className = "px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border-emerald-300";
+        auditText.innerText = `Công chuẩn (${(laborRatio*100).toFixed(1)}%)`;
       }
+    }
+
+    function recalculateCostsheet() {
+      renderCostsheet();
+      alert("Đã cập nhật toàn bộ công thức dung sai tề biên và chi phí Costsheet!");
+    }
+
+    function deleteCostRow(name) {
+      costsheetRows = costsheetRows.filter(r => r.name !== name);
+      renderCostsheet();
+    }
+
+    function sync3DScale() {
+      currentProduct.w = parseFloat(document.getElementById('slider-w').value);
+      currentProduct.d = parseFloat(document.getElementById('slider-d').value);
+      currentProduct.h = parseFloat(document.getElementById('slider-h').value);
+
+      document.getElementById('val-w').innerText = currentProduct.w;
+      document.getElementById('val-d').innerText = currentProduct.d;
+      document.getElementById('val-h').innerText = currentProduct.h;
+      document.getElementById('lbl-dim').innerText = `${currentProduct.w} x ${currentProduct.d} x ${currentProduct.h} mm`;
+
+      buildDynamic3DModel();
+    }
+
+    function update3DExplode() {
+      currentProduct.exp = parseFloat(document.getElementById('slider-exp').value);
+      document.getElementById('val-exp').innerText = Math.round(currentProduct.exp * 100) + "%";
+      buildDynamic3DModel();
+    }
+
+    function setCamera(view) {
+      if (view === 'front') { camera.position.set(1000, 500, 5000); controls.target.set(800, 300, 0); }
+      else if (view === 'side') { camera.position.set(5000, 500, 0); controls.target.set(800, 300, 0); }
+      else if (view === 'top') { camera.position.set(800, 6000, 0); controls.target.set(800, 0, 0); }
+      else { camera.position.set(3800, 2600, 4200); controls.target.set(800, 300, 0); }
       controls.update();
     }
 
-    function exportToCSV() {
-      let csv = "Ma VT,Ten Cau Kien,Ma Kho Master,Vat Tu Masterdata,Mo Ta Spec,DVT,Khoi Luong,Don Gia Goc (VND),Thanh Tien (VND)\n";
-      bomList.forEach(item => {
-        csv += `"${item.id}","${item.name}","${item.masterCode || ''}","${item.masterName || ''}","${item.spec || ''}","${item.unit || ''}",${item.qty},${item.rate},${item.amount}\n`;
+    function switchTab(tId) {
+      ['studio', 'costsheet', 'master'].forEach(t => {
+        document.getElementById(`tab-content-${t}`).classList.add('hidden');
+        document.getElementById(`tab-btn-${t}`).classList.remove('active');
+      });
+      document.getElementById(`tab-content-${tId}`).classList.remove('hidden');
+      document.getElementById(`tab-btn-${tId}`).classList.add('active');
+
+      if (tId === 'studio') {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      }
+    }
+
+    function exportCostsheetToCSV() {
+      let csv = "Nhom,Ma Code,Ten Vat Tu,Dai Net,Rong Net,Day Net,SL,KLTP,Dai Gross (+0.05),Rong Gross (+0.05),Cao Gross,SL Phoi,DVT,KLTT,% Hao Hut,KL TONG,Don Gia Goc,Thanh Tien\n";
+      costsheetRows.forEach(r => {
+        const c = calculateRowData(r);
+        csv += `"${r.group}","${r.code}","${r.name}",${r.g},${r.h},${r.i},${r.j},${c.kltp.toFixed(4)},${c.m.toFixed(3)},${c.n.toFixed(3)},${c.o.toFixed(3)},${c.p},"${r.unit}",${c.kltt.toFixed(4)},${(((r.wastage||1.15)-1)*100).toFixed(0)}%,${c.kltong.toFixed(4)},${r.price},${Math.round(c.amount)}\n`;
       });
       const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Du_Toan_BOQ_${currentModel.w}x${currentModel.d}.csv`;
+      a.download = `Costsheet_Chuan_Villa_HN_${currentProduct.name}.csv`;
       a.click();
     }
 
-    function onWindowResize() {
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
+    function renderDongia() {
+      const tbody = document.getElementById('dongia-tbody');
+      tbody.innerHTML = dongiaCatalog.map(d => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="p-2.5 font-mono font-bold text-sky-700">${d.code}</td>
+          <td class="p-2.5 font-semibold text-slate-800">${d.name}</td>
+          <td class="p-2.5 text-center text-slate-600">${d.unit}</td>
+          <td class="p-2.5 text-right font-mono text-slate-600">${((d.wastage-1)*100).toFixed(0)}%</td>
+          <td class="p-2.5 text-right font-mono font-bold text-slate-900">${d.price.toLocaleString('vi-VN')} đ</td>
+        </tr>
+      `).join('');
     }
-    window.addEventListener('resize', onWindowResize);
 
     function animate() {
       requestAnimationFrame(animate);
@@ -705,14 +670,9 @@
       renderer.render(scene, camera);
     }
 
-    // Đóng dropdown khi click ra ngoài
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('td')) {
-        document.querySelectorAll('.dropdown-search-list').forEach(d => d.classList.add('hidden'));
-      }
-    });
-
-    draw3D();
+    renderCostsheet();
+    renderDongia();
+    buildDynamic3DModel();
     animate();
   </script>
 </body>
