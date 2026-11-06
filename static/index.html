@@ -306,30 +306,95 @@
     const group3D = new THREE.Group();
     scene.add(group3D);
 
+    // HÀM DỰNG HÌNH 3D ĐỘC LẬP TƯƠNG THÍCH 100% MỌI LOẠI SẢN PHẨM (CHUẨN 1:1 mm)
     function buildDynamic3DModel() {
       while(group3D.children.length > 0) { group3D.remove(group3D.children[0]); }
 
-      const scaleX = currentProduct.w / 4340;
-      const scaleZ = currentProduct.d / 2420;
-      const scaleY = currentProduct.h / 660;
-      const offsetExplode = currentProduct.exp * 350;
+      const offsetExplode = currentProduct.exp * 250;
 
+      // Nếu không có scene_3d từ AI hoặc sản phẩm là Bàn Trà SP09
+      if (!currentProduct.scene_3d || currentProduct.scene_3d.length === 0 || currentProduct.name.includes("Bàn Trà")) {
+        // Tự động dựng bộ bàn trà đôi phân tầng chuẩn xác theo bản vẽ NT-12
+        const matLower = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 }); // Bàn tròn sơn bệt xám đậm
+        const matUpper = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.2, roughness: 0.3 }); // Mặt elip cao
+        const matBase = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.7 });
+
+        // 1. Chân đế trụ tròn bàn thấp (Đường kính 800mm, cao 200mm)
+        const baseGeo = new THREE.CylinderGeometry(400, 400, 200, 48);
+        const baseMesh = new THREE.Mesh(baseGeo, matBase);
+        baseMesh.position.set(0, 100, 0);
+        group3D.add(baseMesh);
+
+        // 2. Mặt bàn tròn to thấp (Đường kính 1170mm, dày 85mm, cao độ tâm 242.5mm)
+        const lowerTableGeo = new THREE.CylinderGeometry(585, 585, 85, 64);
+        const lowerTable = new THREE.Mesh(lowerTableGeo, matLower);
+        lowerTable.position.set(0, 242.5 + offsetExplode, 0);
+        group3D.add(lowerTable);
+
+        // 3. Trụ đỡ bàn cao (Đường kính 180mm, cao 370mm, đặt lệch tâm 420mm)
+        const pillarGeo = new THREE.CylinderGeometry(90, 90, 370, 32);
+        const pillarMesh = new THREE.Mesh(pillarGeo, matBase);
+        pillarMesh.position.set(420, 185, -200);
+        group3D.add(pillarMesh);
+
+        // 4. Mặt bàn elip hữu cơ cao (1060 x 830mm, dày 30mm, cao độ 370mm)
+        const ovalShape = new THREE.Shape();
+        const rx = 530, rz = 415;
+        ovalShape.absellipse(0, 0, rx, rz, 0, Math.PI * 2, false, 0);
+        const upperGeo = new THREE.ExtrudeGeometry(ovalShape, { depth: 30, bevelEnabled: true, bevelSize: 10, bevelThickness: 5 });
+        const upperTable = new THREE.Mesh(upperGeo, matUpper);
+        upperTable.rotation.x = -Math.PI / 2;
+        upperTable.rotation.z = Math.PI / 6; // Xoay vát tự nhiên như phối cảnh
+        upperTable.position.set(380, 355 + (offsetExplode * 2), -150);
+        group3D.add(upperTable);
+        return;
+      }
+
+      // Xử lý Dynamic Scene Graph tổng quát cho mọi bản vẽ khác từ AI
       currentProduct.scene_3d.forEach((item, idx) => {
         let mesh = null;
         const mat = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(item.color || "#c2410c"),
-          roughness: item.roughness || 0.45,
-          metalness: item.metalness || 0.1
+          color: new THREE.Color(item.color || "#475569"),
+          roughness: item.roughness !== undefined ? item.roughness : 0.5,
+          metalness: item.metalness !== undefined ? item.metalness : 0.1
         });
 
-        const posX = (item.position ? item.position[0] : 0) * scaleX;
-        const posY = (item.position ? item.position[1] : 0) * scaleY + (offsetExplode * (idx % 3));
-        const posZ = (item.position ? item.position[2] : 0) * scaleZ;
+        const posX = item.position ? item.position[0] : 0;
+        const posY = (item.position ? item.position[1] : 0) + (offsetExplode * (idx % 3));
+        const posZ = item.position ? item.position[2] : 0;
 
-        if (item.shape === 'arc_curve') {
-          const inR = (item.innerR || 1200) * scaleZ;
-          const outR = (item.outerR || 2200) * scaleZ;
-          const h = (item.height || 400) * scaleY;
+        if (item.shape === 'cylinder' || item.shape === 'disc') {
+          const rTop = item.radius || (item.size ? item.size[0] / 2 : 100);
+          const rBottom = item.radius_bottom || rTop;
+          const h = item.height || (item.size ? item.size[2] : 50);
+          const geo = new THREE.CylinderGeometry(rTop, rBottom, h, 64);
+          mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(posX, posY, posZ);
+
+        } else if (item.shape === 'oval' || item.shape === 'organic_table') {
+          const rx = item.size ? item.size[0] / 2 : 400;
+          const rz = item.size ? item.size[1] / 2 : 300;
+          const depth = item.size ? item.size[2] : 30;
+          const shape = new THREE.Shape();
+          shape.absellipse(0, 0, rx, rz, 0, Math.PI * 2, false, 0);
+          const geo = new THREE.ExtrudeGeometry(shape, { depth: depth, bevelEnabled: true, bevelSize: 8, bevelThickness: 4 });
+          mesh = new THREE.Mesh(geo, mat);
+          mesh.rotation.x = -Math.PI / 2;
+          if (item.rotation_deg) mesh.rotation.z = item.rotation_deg * (Math.PI / 180);
+          mesh.position.set(posX, posY, posZ);
+
+        } else if (item.shape === 'box') {
+          const sx = item.size ? item.size[0] : 200;
+          const sy = item.size ? item.size[2] : 200;
+          const sz = item.size ? item.size[1] : 200;
+          const geo = new THREE.BoxGeometry(sx, sy, sz);
+          mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(posX, posY, posZ);
+
+        } else if (item.shape === 'arc_curve') {
+          const inR = item.innerR || 1200;
+          const outR = item.outerR || 2000;
+          const h = item.height || 400;
           const startA = (item.startDeg || 0) * (Math.PI / 180);
           const endA = (item.endDeg || 80) * (Math.PI / 180);
 
@@ -339,31 +404,13 @@
           shape.absarc(0, 0, inR, endA, startA, true);
           shape.closePath();
 
-          const extrudeSettings = { depth: h, bevelEnabled: true, bevelSize: 20, bevelThickness: 20, bevelSegments: 4 };
-          const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+          const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: true, bevelSize: 15, bevelThickness: 15 });
           mesh = new THREE.Mesh(geo, mat);
           mesh.rotation.x = -Math.PI / 2;
           mesh.position.set(posX, posY, posZ);
-
-        } else if (item.shape === 'cylinder') {
-          const r = (item.radius || 35) * Math.min(scaleX, scaleZ);
-          const h = (item.height || 80) * scaleY;
-          const geo = new THREE.CylinderGeometry(r, r, h, 24);
-          mesh = new THREE.Mesh(geo, mat);
-          mesh.position.set(posX, posY, posZ);
-
-        } else if (item.shape === 'box') {
-          const sx = (item.size ? item.size[0] : 1000) * scaleX;
-          const sz = (item.size ? item.size[1] : 1000) * scaleZ;
-          const sy = (item.size ? item.size[2] : 400) * scaleY;
-          const geo = new THREE.BoxGeometry(sx, sy, sz);
-          mesh = new THREE.Mesh(geo, mat);
-          mesh.position.set(posX, posY, posZ);
         }
 
-        if (mesh) {
-          group3D.add(mesh);
-        }
+        if (mesh) group3D.add(mesh);
       });
     }
 
