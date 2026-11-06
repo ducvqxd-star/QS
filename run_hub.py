@@ -25,6 +25,7 @@ if __name__ == "__main__":
     print(f"[*] May chu cua ban truy cap tai : http://localhost:{port}")
     print(f"[*] Nhan vien cung mang Wi-Fi vao: http://{local_ip}:{port}")
     print("="*65)
+    print("May chu dang khoi chay, vui long giu nguyen cua so nay...")
     
     try:
         webbrowser.open(f"http://localhost:{port}")
